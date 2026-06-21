@@ -44,3 +44,14 @@ def get_pr_diff(installation_id: int, repo_full_name: str, pr_number: int) -> st
     }
     response = requests.get(pr.url, headers=headers)
     return response.text
+
+def post_pr_comment(installation_id: int, repo_full_name: str, pr_number: int, comment_body: str):
+    """
+    Posts the AI-generated review as a comment on the pull request.
+    This uses the same installation-scoped client we used to fetch the diff —
+    GitHub Apps act on behalf of the installation, not a personal user account.
+    """
+    gh = get_installation_client(installation_id)
+    repo = gh.get_repo(repo_full_name)
+    pr = repo.get_pull(pr_number)
+    pr.create_issue_comment(comment_body)
