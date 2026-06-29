@@ -55,3 +55,29 @@ def post_pr_comment(installation_id: int, repo_full_name: str, pr_number: int, c
     repo = gh.get_repo(repo_full_name)
     pr = repo.get_pull(pr_number)
     pr.create_issue_comment(comment_body)
+
+def get_repo_files(installation_id: int, repo_full_name: str) -> dict[str, str]:
+    """
+    Fetches all Python files from the repo's default branch.
+    Returns a dict of {file_path: file_content}.
+    This is what we chunk and embed for RAG context.
+    """
+    gh = get_installation_client(installation_id)
+    repo = gh.get_repo(repo_full_name)
+    
+    files = {}
+    try:
+        contents = repo.get_contents("")
+        while contents:
+            file_content = contents.pop(0)
+            if file_content.type == "dir":
+                contents.extend(repo.get_contents(file_content.path))
+            elif file_content.path.endswith(".py"):
+                try:
+                    files[file_content.path] = file_content.decoded_content.decode("utf-8")
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"   Warning: could not fetch repo files: {e}")
+    
+    return files    

@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 from google import genai
 from dotenv import load_dotenv
 
-load_dotenv()
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -11,9 +13,11 @@ REVIEW_PROMPT_TEMPLATE = """You are an expert code reviewer. Review the followin
 
 Focus on:
 - Bugs or logic errors
-- Security vulnerabilities
+- Security vulnerabilities  
 - Code style and readability issues
 - Missing error handling
+
+{context_section}
 
 Be concise. For each issue found, give:
 1. The file and line (if visible in the diff)
@@ -26,25 +30,37 @@ DIFF:
 {diff}
 """
 
-def generate_review(diff: str) -> str:
+def generate_review(diff: str, context_chunks: list[dict] = None) -> str:
     """
-    Sends the PR diff to Gemini 2.5 Flash and gets back a structured
-    code review as plain text. We're using the free tier here —
-    Gemini 2.5 Flash is fast and cheap, good enough for this use case.
-    
-    Note: Large diffs can exceed context limits. For now we truncate
-    to keep it simple — proper chunking comes in Week 2 with RAG.
+    Sends the PR diff + relevant codebase context to Gemini.
+    context_chunks come from pgvector RAG retrieval.
     """
-    # Truncate very large diffs to avoid hitting token limits
-    max_chars = 15000
+    max_chars = 12000
     if len(diff) > max_chars:
-        diff = diff[:max_chars] + "\n\n... (diff truncated for length)"
+        diff = diff[:max_chars] + "\n\n... (diff truncated)"
 
-    prompt = REVIEW_PROMPT_TEMPLATE.format(diff=diff)
+    # Build context section from RAG results
+    if context_chunks:
+        context_parts = []
+        for chunk in context_chunks:
+            context_parts.append(
+                f"# {chunk['chunk_type']}: {chunk['chunk_name']} "
+                f"(from {chunk['file_path']}, similarity: {chunk['similarity']:.2f})\n"
+                f"{chunk['content']}"
+            )
+        context_text = "\n\n".join(context_parts)
+        context_section = f"Here is relevant existing code from the codebase for context:\n\n{context_text}\n"
+    else:
+        context_section = ""
+
+    prompt = REVIEW_PROMPT_TEMPLATE.format(
+        diff=diff,
+        context_section=context_section
+    )
 
     response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=prompt
-)
+        model="gemini-2.5-flash",
+        contents=prompt
+    )
 
     return response.text

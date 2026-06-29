@@ -3,12 +3,16 @@ import hmac
 import hashlib
 import os
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 
-from app.github_client import get_pr_diff, post_pr_comment
+from app.github_client import get_pr_diff, post_pr_comment, get_repo_files
 from app.gemini_reviewer import generate_review
+from app.chunker import chunk_repository
+from app.embedder import store_chunks, retrieve_similar_chunks
 
-load_dotenv()
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 router = APIRouter()
 WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "")
@@ -40,8 +44,6 @@ async def github_webhook(request: Request):
 
         if action == "opened":
             print(f"\n🚀 PR #{pr_number} opened on {repo_full_name}")
-            print(f"   Title: {payload['pull_request']['title']}")
-            print(f"   Author: {payload['pull_request']['user']['login']}")
 
             try:
                 # Node 1 — fetch the diff
@@ -49,18 +51,39 @@ async def github_webhook(request: Request):
                 diff = get_pr_diff(installation_id, repo_full_name, pr_number)
                 print(f"   Diff length: {len(diff)} chars")
 
-                # Node 3 — generate review (we're skipping Node 2/RAG until Week 2)
+                # Node 2 — RAG: index repo + retrieve context
+                print("   📚 Indexing repository for RAG...")
+                repo_files = get_repo_files(installation_id, repo_full_name)
+                chunks = chunk_repository(repo_files)
+                print(f"   Found {len(chunks)} code chunks")
+
+                if chunks:
+                    store_chunks(repo_full_name, chunks)
+                    context_chunks = retrieve_similar_chunks(
+                        repo_full_name, diff, top_k=5
+                    )
+                    print(f"   Retrieved {len(context_chunks)} relevant chunks")
+                else:
+                    context_chunks = []
+                    print("   No Python chunks found, skipping RAG")
+
+                # Node 3 — generate review with context
                 print("   🤖 Generating review with Gemini...")
-                review = generate_review(diff)
+                review = generate_review(diff, context_chunks)
                 print(f"\n--- REVIEW ---\n{review}\n--------------")
 
-                # Node 4 — post the review as a PR comment
+                # Node 4 — post comment
                 print("   💬 Posting comment to PR...")
                 comment_header = "## 🤖 RepoMind Review\n\n"
-                post_pr_comment(installation_id, repo_full_name, pr_number, comment_header + review)
+                post_pr_comment(
+                    installation_id, repo_full_name, pr_number,
+                    comment_header + review
+                )
                 print("   ✅ Comment posted!")
 
             except Exception as e:
-                print(f"   ❌ Error during review pipeline: {e}")
+                print(f"   ❌ Error: {e}")
+                import traceback
+                traceback.print_exc()
 
     return {"status": "ok"}
