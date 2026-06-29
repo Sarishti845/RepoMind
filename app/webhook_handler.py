@@ -5,7 +5,6 @@ import os
 import json
 from pathlib import Path
 from dotenv import load_dotenv
-
 from app.github_client import get_pr_diff, post_pr_comment, get_repo_files
 from app.gemini_reviewer import generate_review
 from app.chunker import chunk_repository
@@ -28,7 +27,6 @@ def verify_signature(payload: bytes, signature: str) -> bool:
 @router.post("/webhooks/github")
 async def github_webhook(request: Request):
     payload_bytes = await request.body()
-
     signature = request.headers.get("X-Hub-Signature-256", "")
     if WEBHOOK_SECRET and not verify_signature(payload_bytes, signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
@@ -43,46 +41,35 @@ async def github_webhook(request: Request):
         installation_id = payload["installation"]["id"]
 
         if action == "opened":
-            print(f"\n🚀 PR #{pr_number} opened on {repo_full_name}")
-
+            print(f"\n*** PR #{pr_number} opened on {repo_full_name} ***")
             try:
-                # Node 1 — fetch the diff
-                print("   📥 Fetching diff...")
+                print("   Fetching diff...")
                 diff = get_pr_diff(installation_id, repo_full_name, pr_number)
                 print(f"   Diff length: {len(diff)} chars")
 
-                # Node 2 — RAG: index repo + retrieve context
-                print("   📚 Indexing repository for RAG...")
+                print("   Indexing repository for RAG...")
                 repo_files = get_repo_files(installation_id, repo_full_name)
                 chunks = chunk_repository(repo_files)
                 print(f"   Found {len(chunks)} code chunks")
 
                 if chunks:
                     store_chunks(repo_full_name, chunks)
-                    context_chunks = retrieve_similar_chunks(
-                        repo_full_name, diff, top_k=5
-                    )
+                    context_chunks = retrieve_similar_chunks(repo_full_name, diff, top_k=5)
                     print(f"   Retrieved {len(context_chunks)} relevant chunks")
                 else:
                     context_chunks = []
                     print("   No Python chunks found, skipping RAG")
 
-                # Node 3 — generate review with context
-                print("   🤖 Generating review with Gemini...")
+                print("   Generating review with Gemini...")
                 review = generate_review(diff, context_chunks)
                 print(f"\n--- REVIEW ---\n{review}\n--------------")
 
-                # Node 4 — post comment
-                print("   💬 Posting comment to PR...")
-                comment_header = "## 🤖 RepoMind Review\n\n"
-                post_pr_comment(
-                    installation_id, repo_full_name, pr_number,
-                    comment_header + review
-                )
-                print("   ✅ Comment posted!")
+                print("   Posting comment to PR...")
+                post_pr_comment(installation_id, repo_full_name, pr_number, "## RepoMind Review\n\n" + review)
+                print("   Comment posted!")
 
             except Exception as e:
-                print(f"   ❌ Error: {e}")
+                print(f"   ERROR: {e}")
                 import traceback
                 traceback.print_exc()
 
