@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+content = '''from fastapi import APIRouter, Request, HTTPException
 import hmac
 import hashlib
 import os
@@ -56,10 +56,15 @@ async def github_webhook(request: Request):
                 print("Generating review...")
                 review = generate_review(diff, context_chunks)
                 print("Posting comment...")
-                post_pr_comment(installation_id, repo_full_name, pr_number, "## RepoMind Review\n\n" + review)
+                post_pr_comment(installation_id, repo_full_name, pr_number, "## RepoMind Review\\n\\n" + review)
                 print("Done!")
             except Exception as e:
                 print("ERROR: " + str(e))
                 import traceback
                 traceback.print_exc()
     return {"status": "ok"}
+'''
+
+with open('app/webhook_handler.py', 'w', encoding='utf-8') as f:
+    f.write(content)
+print('File written successfully')
