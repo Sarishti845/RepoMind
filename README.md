@@ -62,6 +62,16 @@ flowchart LR
 
 ---
 
+## RAG Storage — pgvector in action
+
+Code chunks from the repository are embedded and stored in Supabase pgvector. When a PR opens, the diff is embedded and the top-5 most semantically similar chunks are retrieved as context for Gemini.
+
+![Supabase code_chunks table](assets/supabase.png)
+
+Each row stores: `repo_full_name`, `file_path`, `chunk_type`, `chunk_name`, `content`, and a `vector(384)` embedding used for cosine similarity search.
+
+---
+
 ## RAG in action
 
 When a new `percentage()` function was added in a PR, Gemini flagged:
