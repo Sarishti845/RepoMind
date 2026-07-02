@@ -111,6 +111,8 @@ GitHub Apps have scoped per-installation permissions, generate short-lived token
 ---
 
 ## Project Structure
+
+```
 repomind/
 ├── app/
 │   ├── main.py              # FastAPI entry point, router mounting
@@ -122,6 +124,7 @@ repomind/
 │   └── embedder.py          # fastembed vectors, pgvector storage + retrieval
 ├── Dockerfile               # python:3.12-slim, uvicorn on 0.0.0.0:8000
 └── requirements.txt
+```
 
 ---
 
