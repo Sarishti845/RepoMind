@@ -81,3 +81,18 @@ def get_repo_files(installation_id: int, repo_full_name: str) -> dict[str, str]:
         print(f"   Warning: could not fetch repo files: {e}")
     
     return files    
+
+def has_already_commented(installation_id: int, repo_full_name: str, pr_number: int) -> bool:
+    """
+    Checks if RepoMind has already posted a review comment on this PR.
+    Prevents duplicate comments when new commits are pushed to an open PR.
+    """
+    gh = get_installation_client(installation_id)
+    repo = gh.get_repo(repo_full_name)
+    pr = repo.get_pull(pr_number)
+    
+    for comment in pr.get_issue_comments():
+        if "RepoMind Review" in comment.body:
+            print("Already commented on this PR — skipping.")
+            return True
+    return False
