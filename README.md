@@ -52,20 +52,13 @@ flowchart LR
 
 ---
 
-## Real bugs caught
+## Demo
 
-> On a single PR containing `user_service.py`, RepoMind automatically caught **8 issues** in under 10 seconds:
+> RepoMind automatically reviewing a PR — from webhook received to comment posted in under 10 seconds.
 
-- 🔴 **SQL injection** in `get_user()` — string concatenation into query
-- 🔴 **Missing WHERE clause** on `DELETE FROM users` — would delete all rows
-- 🔴 **Mutable default argument** `password=[]` — classic Python gotcha
-- 🔴 **Undefined function** `send_email` called without import
-- 🔴 **Plaintext password storage** in `UserManager`
-- 🟡 Missing type hints across all functions
-- 🟡 Inconsistent return types in `update_password()`
-- 🟡 Missing docstrings on public methods
+![RepoMind demo](assets/demo.gif)
 
-The mutable default argument catch is Python-specific — only detected because of per-language prompt specialization.
+**What you're seeing:** A PR is opened containing SQL injection, a missing WHERE clause on DELETE, and a mutable default argument. RepoMind's bot detects all of them automatically and posts a structured review with suggested fixes — zero manual action required.
 
 ---
 
