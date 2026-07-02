@@ -1,0 +1,12 @@
+﻿venv/
+.env
+*.pem
+__pycache__/
+*.pyc
+.git/
+models/
+fix.py
+write_handler.py
+test_gemini.py
+build_*.js
+unpacked*/
