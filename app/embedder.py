@@ -1,9 +1,9 @@
 import os
 import psycopg2
 from pgvector.psycopg2 import register_vector
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
 from dotenv import load_dotenv
+from fastembed import TextEmbedding
 
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
@@ -11,18 +11,16 @@ load_dotenv(dotenv_path=env_path)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Lazy loading — model loads on first request, not at import time
-# This lets uvicorn start instantly without waiting for model load
+# fastembed uses ONNX runtime instead of PyTorch — much lighter for deployment
+# all-MiniLM-L6-v2 produces 384-dimensional vectors, same as before
 _model = None
 
 def get_model():
     global _model
     if _model is None:
-        print("   🔄 Loading embedding model...")
-        _model = SentenceTransformer(
-            "all-MiniLM-L6-v2",
-            cache_folder="C:/Users/Sarishti/repomind/models"
-        )
-        print("   ✅ Embedding model loaded.")
+        print("Loading embedding model (fastembed)...")
+        _model = TextEmbedding("sentence-transformers/all-MiniLM-L6-v2")
+        print("Embedding model loaded.")
     return _model
 
 
@@ -34,23 +32,22 @@ def get_db_connection():
 
 def embed_text(text: str) -> list[float]:
     """
-    Converts a piece of text into a 384-dimensional vector.
-    Similar code will produce similar vectors — this is what
-    makes semantic search possible.
+    Converts text into a 384-dimensional vector using fastembed.
+    Uses ONNX runtime instead of PyTorch — same vectors, much smaller footprint.
     """
-    return get_model().encode(text).tolist()
+    model = get_model()
+    embeddings = list(model.embed([text]))
+    return embeddings[0].tolist()
 
 
 def store_chunks(repo_full_name: str, chunks: list[dict]):
     """
-    Embeds each chunk and stores it in pgvector.
-    First deletes existing chunks for this repo so we don't
-    accumulate stale embeddings on repeated indexing.
+    Embeds each chunk and stores in pgvector.
+    Deletes existing chunks for this repo first to avoid stale data.
     """
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Clear old chunks for this repo first
     cur.execute(
         "DELETE FROM code_chunks WHERE repo_full_name = %s",
         (repo_full_name,)
@@ -60,7 +57,7 @@ def store_chunks(repo_full_name: str, chunks: list[dict]):
         embedding = embed_text(chunk["content"])
         cur.execute(
             """
-            INSERT INTO code_chunks 
+            INSERT INTO code_chunks
             (repo_full_name, file_path, chunk_type, chunk_name, content, embedding)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
@@ -82,11 +79,7 @@ def store_chunks(repo_full_name: str, chunks: list[dict]):
 
 def retrieve_similar_chunks(repo_full_name: str, query_text: str, top_k: int = 5) -> list[dict]:
     """
-    Embeds the query text (the PR diff) and finds the top_k most
-    semantically similar chunks from the codebase using cosine similarity.
-    
-    This is the core of RAG — instead of sending the whole codebase to
-    Gemini, we only send the most relevant pieces.
+    Embeds the query and finds top_k most similar chunks via cosine similarity.
     """
     query_embedding = embed_text(query_text)
 
