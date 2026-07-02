@@ -133,28 +133,78 @@ repomind/
 
 ## Local Setup
 
+### Prerequisites
+
+Before running RepoMind, you need to create:
+
+1. **GitHub App** — [Create one here](https://github.com/settings/apps/new)
+   - Webhook URL: your ngrok URL + `/webhooks/github`
+   - Permissions: Pull requests (Read & Write), Contents (Read), Metadata (Read)
+   - Events: Pull request
+   - Generate and download a private key (`.pem` file)
+
+2. **Supabase project** — [Create one here](https://supabase.com)
+   - Enable the `vector` extension under Database → Extensions
+   - Run this in SQL Editor:
+```sql
+   CREATE TABLE code_chunks (
+       id BIGSERIAL PRIMARY KEY,
+       repo_full_name TEXT NOT NULL,
+       file_path TEXT NOT NULL,
+       chunk_type TEXT NOT NULL,
+       chunk_name TEXT NOT NULL,
+       content TEXT NOT NULL,
+       embedding vector(384),
+       created_at TIMESTAMPTZ DEFAULT NOW()
+   );
+   CREATE INDEX ON code_chunks
+   USING ivfflat (embedding vector_cosine_ops)
+   WITH (lists = 100);
+```
+   - Copy the **Session pooler** connection URL from Connect → Direct
+
+3. **Gemini API key** — [Get one here](https://aistudio.google.com/apikey) (free)
+
+---
+
+### Installation
+
 ```bash
 git clone https://github.com/Sarishti845/RepoMind.git
 cd RepoMind
 python -m venv venv
 venv\Scripts\activate        # Windows
+source venv/bin/activate     # Mac/Linux
 pip install -r requirements.txt
 ```
 
-Create `.env`:
+Create `.env` in the root folder:
 ```env
-GITHUB_APP_ID=your_app_id
+GITHUB_APP_ID=your_github_app_id
 GITHUB_PRIVATE_KEY_PATH=your_key.pem
-GITHUB_WEBHOOK_SECRET=your_secret
+GITHUB_WEBHOOK_SECRET=your_webhook_secret
 DATABASE_URL=your_supabase_session_pooler_url
-GEMINI_API_KEY=your_gemini_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ngrok http 8000
-# Update GitHub App webhook URL to: https://your-ngrok-url/webhooks/github
 ```
+
+Update your GitHub App's webhook URL to:
+https://your-ngrok-url.ngrok-free.app/webhooks/github
+
+Then install your GitHub App on any repo — every PR will be reviewed automatically.
+
+---
+
+### Deploy to Render (permanent URL)
+
+1. Fork this repo
+2. Create a new Web Service on [Render](https://render.com) → connect your fork
+3. Add environment variables (same as `.env` above, but use `GITHUB_PRIVATE_KEY` with the full key contents instead of a file path)
+4. Deploy — Render uses the Dockerfile automatically
 
 ---
 
