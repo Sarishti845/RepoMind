@@ -1,25 +1,32 @@
 import os
-import jwt
-import time
 import requests
+from pathlib import Path
 from github import Github, GithubIntegration
 from dotenv import load_dotenv
 
-load_dotenv()
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 APP_ID = os.getenv("GITHUB_APP_ID")
+
+# On Render: GITHUB_PRIVATE_KEY contains the full key contents as env var
+# On local:  GITHUB_PRIVATE_KEY_PATH contains the path to the .pem file
+PRIVATE_KEY_CONTENT = os.getenv("GITHUB_PRIVATE_KEY")
 PRIVATE_KEY_PATH = os.getenv("GITHUB_PRIVATE_KEY_PATH")
 
 def get_installation_client(installation_id: int) -> Github:
     """
-    GitHub Apps don't use a single static token like a personal access token.
-    Instead: we sign a JWT with our private key, exchange it for a short-lived
-    installation access token (valid ~1 hour), and use THAT to make API calls.
-    This is more secure — if a token leaks, it expires soon and is scoped
-    only to the repos this installation was given access to.
+    GitHub Apps don't use a static token. Instead we sign a JWT with our
+    private key, exchange it for a short-lived installation access token
+    (valid ~1 hour), scoped only to repos this installation has access to.
+    On Render: reads key from GITHUB_PRIVATE_KEY environment variable.
+    On local:  reads key from the .pem file at GITHUB_PRIVATE_KEY_PATH.
     """
-    with open(PRIVATE_KEY_PATH, "r") as key_file:
-        private_key = key_file.read()
+    if PRIVATE_KEY_CONTENT:
+        private_key = PRIVATE_KEY_CONTENT
+    else:
+        with open(PRIVATE_KEY_PATH, "r") as key_file:
+            private_key = key_file.read()
 
     integration = GithubIntegration(APP_ID, private_key)
     access_token = integration.get_access_token(installation_id).token
