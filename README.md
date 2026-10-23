@@ -7,7 +7,7 @@
 ![pgvector](https://img.shields.io/badge/pgvector-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Render](https://img.shields.io/badge/Live_on_Render-46E3B7?style=for-the-badge)
 
-> **An agentic system that automatically reviews GitHub pull requests** — fetches the diff, retrieves relevant codebase context via pgvector RAG, generates structured feedback via Gemini 2.5 Flash, and posts inline comments. Zero manual action required.
+> **An agentic system that automatically reviews GitHub pull requests** — fetches the diff, retrieves relevant codebase context via pgvector RAG, generates structured feedback via Gemini 2.5 Flash, and posts the review as a comment on the PR. Zero manual action required.
 
 🔗 **Live:** https://repomind-vlry.onrender.com &nbsp;|&nbsp; 📁 **Repo:** https://github.com/Sarishti845/RepoMind
 
@@ -100,7 +100,7 @@ Gemini knew about `divide()` — which was **not in the diff** — because it wa
 ## Key Engineering Decisions
 
 **Why LangGraph over a plain function chain?**
-Each node owns one responsibility. If Gemini's API changes, only Node 3 changes. Nodes are independently retryable — a Gemini failure doesn't re-fetch the diff. Adding a step is `add_node()` + `add_edge()`.
+Each node owns one responsibility. If Gemini's API changes, only Node 3 changes. Adding a step is `add_node()` + `add_edge()`.
 
 **Why AST chunking over line splits?**
 `ast.parse()` guarantees every chunk is a complete, syntactically valid unit. Line-count splitting could cut a function midway, producing meaningless embeddings.
@@ -210,7 +210,7 @@ Then install your GitHub App on any repo — every PR will be reviewed automatic
 
 ## Built by
 
-**Sarishti** — Final year B.Tech CSE, TIET (CGPA 9.50)
-Amazon ML Summer School 2024 — selected from 80,000 applicants (top ~3,000)
+**Sarishti** — Final year B.Tech CSE, TIET (CGPA 9.53)
+Amazon ML Summer School 2025 — selected from 80,000 applicants (top ~3,000)
 
 *Built end-to-end as a solo project — every line written, debugged, and deployed independently.*
